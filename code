@@ -483,20 +483,20 @@ void loop() {
   }
   if(liftTime != 0 && time - liftTime > 3000) {
     liftDown();
-    delay(3000);
+    delay(1000);
     grabAll();
-    delay(3000);
+    delay(1000);
     liftUp();
-    delay(3000);
+    delay(1000);
     backward(0);
     delay(1000);
     brakeAll();
     stopAll();
-    delay(3000);
+    delay(1000);
     liftDown();
-    delay(3000);
+    delay(1000);
     dropAll();
-    delay(3000);
+    delay(1000);
     liftUp();
     delay(1000);
   }
