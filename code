@@ -1,0 +1,557 @@
+#include <NewPing.h>
+#include <Servo.h>
+#include <LiquidCrystal.h>
+
+#define SPEED 255
+#define turnSlower -30
+
+//lcd
+//LiquidCrystal lcd(22, 24, 28, 30, 32, 34);
+
+//l298n
+#define ENA 2
+#define IN1 3
+#define IN2 4
+#define ENB 7
+#define IN3 5
+#define IN4 6
+
+//hc-sr04
+#define trigger_P  A4
+#define echo_P     A3
+#define maxDistance 400
+NewPing sonar(trigger_P, echo_P, maxDistance);
+unsigned int uS;
+unsigned int distance;
+
+//servo
+#define mg995 8
+#define sg90L 9
+#define sg90R 10
+Servo lift;
+Servo grabL;
+Servo grabR;
+
+//ugn3113u
+#define ugnPower 40
+#define ugnL_P 30
+#define ugnML_P 28
+#define ugnM_P 26
+#define ugnMR_P 24
+#define ugnR_P 22
+boolean ugnL = false;
+boolean ugnML = false;
+boolean ugnM = false;
+boolean ugnMR = false;
+boolean ugnR = false;
+
+//lm393
+#define lmL_P A15
+#define lmML_P A14
+#define lmM_P A2
+#define lmMR_P A1
+#define lmR_P A0
+boolean lmL = false;
+boolean lmML = false;
+boolean lmM = false;
+boolean lmMR = false;
+boolean lmR = false;
+
+//variables
+
+byte distanceCounter = 0;
+unsigned long int time = 0;
+unsigned long int cmTime = 0;
+unsigned long int branchTime = 0;
+unsigned long int liftTime = 0;
+boolean L = false;
+boolean ML = false;
+boolean M = false;
+boolean MR = false;
+boolean R = false;
+boolean straight = false;
+boolean leftAlig = false;
+boolean rightAlig = false;
+boolean turn = true;
+byte branchCounter = 0;
+boolean cmTemp = false;
+boolean cmCheck = false;
+unsigned int distanceCheck = 0;
+
+void setup() {
+ Serial.begin(115200);
+//lcd
+ //lcd.begin(16, 2);
+ //lcd.print("testing..."); 
+//l298n
+ pinMode(ENA, OUTPUT);
+ pinMode(ENB, OUTPUT);
+ pinMode(IN1, OUTPUT);
+ pinMode(IN2, OUTPUT);
+ pinMode(IN3, OUTPUT);
+ pinMode(IN4, OUTPUT);
+ digitalWrite(ENA, LOW);
+ digitalWrite(ENB, LOW);
+ digitalWrite(IN1, HIGH); 
+ digitalWrite(IN2, LOW);
+ digitalWrite(IN3, HIGH);
+ digitalWrite(IN4, LOW);
+//servo
+ lift.attach(mg995);
+ grabL.attach(sg90L);
+ grabR.attach(sg90R);
+//ugn3113u
+ pinMode(ugnL, INPUT);
+ pinMode(ugnML, INPUT);
+ pinMode(ugnM, INPUT);
+ pinMode(ugnMR, INPUT);
+ pinMode(ugnR, INPUT);
+ pinMode(ugnPower, OUTPUT);
+ //lm393
+ pinMode(lmL, INPUT);
+ pinMode(lmML, INPUT);
+ pinMode(lmM, INPUT);
+ pinMode(lmMR, INPUT);
+ pinMode(lmR, INPUT);
+}
+
+//motor functions
+void forward1(int x) {
+ digitalWrite(IN1, HIGH); 
+ digitalWrite(IN2, LOW);
+ analogWrite(ENA, SPEED+x);
+}
+void backward1(int x){
+ digitalWrite(IN1, LOW); 
+ digitalWrite(IN2, HIGH);
+ analogWrite(ENA, SPEED+x);
+}
+void brake1() {
+ digitalWrite(IN1, HIGH); 
+ digitalWrite(IN2, HIGH);
+}
+void stop1() {
+  digitalWrite(ENA, LOW);
+}
+void forward2(int x) {
+ digitalWrite(IN3, HIGH); 
+ digitalWrite(IN4, LOW);
+ analogWrite(ENB, SPEED+x);
+}
+void backward2(int x){
+ digitalWrite(IN3, LOW); 
+ digitalWrite(IN4, HIGH);
+ analogWrite(ENB, SPEED+x);
+}
+void brake2() {
+ digitalWrite(IN3, HIGH); 
+ digitalWrite(IN4, HIGH);
+} 
+void stop2() {
+  digitalWrite(ENB, LOW);
+}
+void turnLeft() {
+  backward1(turnSlower);
+  forward2(turnSlower);
+}
+void turnRight() {
+  forward1(turnSlower);
+  backward2(turnSlower);
+}
+void turnLeftSmooth(int x) {
+  forward1(SPEED+x);
+  forward2(x);
+}
+void trunRightSmooth(int x) {
+  forward1(x);
+  forward2(SPEED+x);
+}
+void forward(int x)
+{
+  forward1(x);
+  forward2(x);
+}
+void backward(int x)
+{
+  backward1(x);
+  backward2(x);
+}
+void brakeAll() {
+  brake1();
+  brake2();
+}
+void stopAll() {
+  stop1();
+  stop2();
+}
+
+//servo functions
+void liftUp () {
+  lift.write(20);
+}
+void liftDown () {
+  lift.write(113);
+}
+void grabLgrab () {
+  grabL.write(60);
+}
+void grabRgrab () {
+  grabR.write(170);
+}
+void grabLdrop () {
+  grabL.write(120);
+}
+void grabRdrop () {
+  grabR.write(120);
+}
+void grabAll () {
+  grabLgrab();
+  grabRgrab();
+}
+void dropAll () {
+  grabLdrop();
+  grabRdrop();
+}
+
+
+void loop() {
+
+  time = millis();
+  if(time < 3000) {
+    liftUp();
+    dropAll();
+    delay(3000); 
+  }
+  /*while(true) {
+    liftDown();
+    delay(3000);
+    grabAll();
+    delay(3000);
+    liftUp();
+    delay(3000);
+    liftDown();
+    delay(3000);
+    dropAll();
+    delay(3000);
+    liftUp();
+    delay(3000);
+  }*/
+  digitalWrite(ugnPower, HIGH);
+  delay(10);
+  lmL = digitalRead(lmL_P);
+  lmML = digitalRead(lmML_P);
+  lmM = digitalRead(lmM_P);
+  lmMR = digitalRead(lmMR_P);
+  lmR = digitalRead(lmR_P);
+  ugnL = !digitalRead(ugnL_P);
+  ugnML = !digitalRead(ugnML_P);
+  ugnM = !digitalRead(ugnM_P);
+  ugnMR = !digitalRead(ugnMR_P);
+  ugnR = !digitalRead(ugnR_P);
+  digitalWrite(ugnPower, LOW);
+  delay(10);
+  L = lmL && ugnL;
+  ML = lmML && ugnML;
+  M = lmM && ugnM;
+  MR = lmMR && ugnMR;
+  R = lmR && ugnR;
+  if(L == true && time - branchTime > 500 && turn == false)
+  {
+    branchCounter++;
+  }
+  if(ML == false && M == true && MR == false) 
+  { 
+    leftAlig = false;
+    straight = true;
+    rightAlig = false; 
+  }
+  else if(ML == true && MR == false) 
+  {
+    leftAlig = false;
+    straight = false;
+    rightAlig = true; 
+  }
+  else if(MR == true && ML == false)
+  {
+    leftAlig = true;
+    straight = false;
+    rightAlig = false;
+  }
+  else if(ML == true && M == true && MR == true)
+  {
+    if( L == true && R == false)
+    {
+      leftAlig = false;
+      straight = false;
+      rightAlig = true; 
+    }
+    else if(R == true && L == false)
+    {
+      leftAlig = true;
+      straight = false;
+      rightAlig = false;
+    }
+    else if(R == true && L == true)
+    {
+      leftAlig = false;
+      straight = true;
+      rightAlig = false;
+    }
+  }
+    
+  /*delay(2000);
+  liftUp();
+  delay(5000);
+  liftDown();
+  delay(2000);
+  grabAll();
+  delay(2000);
+  liftUp();
+  delay(5000);
+  liftDown();
+  delay(10000);
+  dropAll();/*
+  /*LMState = digitalRead(LM1);
+  digitalWrite(UGNPower, HIGH);
+  delay(10);
+  UGNLState = digitalRead(UGNL);
+  UGNMState = digitalRead(UGNM);
+  UGNRState = digitalRead(UGNR);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("L:");
+  lcd.print(UGNLState);
+  lcd.print("M:");
+  lcd.print(UGNMState);
+  lcd.print("R:");
+  lcd.print(UGNRState);
+  lcd.print("LM:");
+  lcd.print(LMState); 
+  Serial.print("L: ");
+  Serial.print(UGNLState);
+  Serial.print(" M: ");
+  Serial.print(UGNMState);
+  Serial.print(" R: ");
+  Serial.print(UGNRState);
+  Serial.print(" LM: ");
+  Serial.print(LMState);
+  Serial.print(" LMA: ");
+  Serial.print(LMAState);
+  Serial.print("\n");
+  digitalWrite(UGNPower, LOW);
+  delay(10);*/
+  
+  //lcd.clear();
+
+  
+  /*horizontalClose();
+  delay(5000);
+  horizontalOpen();*/
+  //delay(5000);
+  
+  //delay(100);
+  //delay(20);
+
+  if(cmCheck == true) {
+    distanceCounter = 0;
+    distanceCheck = 0;
+    while(distanceCounter < 10) {
+    uS = sonar.ping();
+    distance = uS / US_ROUNDTRIP_CM;
+    distanceCheck += distance;
+    distanceCounter++;
+    }
+  distanceCheck = int(distanceCheck/10);
+  }
+  else {
+    uS = sonar.ping();
+    distance = uS / US_ROUNDTRIP_CM;
+  }
+  /*Serial.print("Ping: ");
+  Serial.print(uS / US_ROUNDTRIP_CM);
+  Serial.print("cm \n");*/
+  //delay(100);
+  /*Serial.print("lmL: ");
+  Serial.print(lmL);
+  Serial.print(" lmML: ");
+  Serial.print(lmML);
+  Serial.print(" lmM: ");
+  Serial.print(lmM);
+  Serial.print(" lmMR: ");
+  Serial.print(lmMR);
+  Serial.print(" lmR: ");
+  Serial.print(lmR);
+  Serial.print(" ugnL: ");
+  Serial.print(ugnL);
+  Serial.print(" ugnML: ");
+  Serial.print(ugnML);
+  Serial.print(" ugnM: ");
+  Serial.print(ugnM);
+  Serial.print(" ugnMR: ");
+  Serial.print(ugnMR);
+  Serial.print(" ugnR: ");
+  Serial.print(ugnR);
+  Serial.print(" time: ");
+  Serial.print(time);
+  Serial.print(" \n");*/
+  Serial.print("distance: ");
+  Serial.print(distance);
+  Serial.print(" distanceCheck: ");
+  Serial.print(distanceCheck);
+  Serial.print(" cmCheck: ");
+  Serial.print(cmCheck);
+  Serial.print(" time: ");
+  Serial.print(time);
+  Serial.print(" liftTime: ");
+  Serial.print(liftTime);
+  Serial.print(" cmTime: ");
+  Serial.print(cmTime);
+  Serial.print(" time - cmTime: ");
+  Serial.print(time - cmTime); 
+  Serial.print(" time - liftTime: ");
+  Serial.print(time - liftTime);
+  Serial.print("\n");
+  /*lcd.setCursor(0, 1);
+  lcd.print(distance);
+  lcd.print(" cm...");*/
+  
+
+  if(((distance <= maxDistance && distance > 40) || distance == 0) && cmCheck == false && turn == true) {
+    forward(0);
+    liftTime = 0;
+  }
+  else if(distance <= 40 && distance > 30 && cmCheck == false && turn == true) {
+    forward(-50);
+    liftTime = 0;
+  }
+  else if(distance <= 30 && distance > 15 && cmCheck == false && turn == true) {
+    forward(-110);
+    liftTime = 0;
+  }
+  else if(distance == 15 && cmCheck == false && turn == true)
+  {
+    backward(0);
+    delay(20);
+    forward(-120);
+    delay(100);
+    liftTime = 0;
+  }
+  else if(distance < 15 && distance > 7 && cmCheck == false && turn == true) {
+    forward(-120);
+    liftTime = 0;
+  }
+  else if(distance <= 7 && distance > 4 && turn == true) {
+    forward(-130);
+    delay(40);
+    brakeAll();
+    stopAll();
+    liftTime = 0;
+  }
+  else if(distance == 4 && cmCheck == false && turn == true) {
+    brakeAll();
+    stopAll();
+    //cmTime = time;
+    if(liftTime == 0) {
+      liftTime = time; }
+  }
+  else if(distance < 4 && cmCheck == false && turn == true) {
+    brakeAll();
+    stopAll();
+    backward(-50);
+    cmTemp = true;
+    delay(20);
+    liftTime = 0;
+  }
+  if(cmTemp == true ) { 
+    cmCheck = true;
+    cmTemp = false;
+  }
+  
+  if(cmCheck == true)
+  {
+    backward(-20);
+    delay(40);
+    brakeAll();
+    stopAll();
+    liftTime = 0;
+  }
+  if(cmCheck == true && distance == distanceCheck && distanceCheck >= 4)
+  {
+    brakeAll();
+    stopAll();
+    cmCheck = false;
+  }
+  if(liftTime != 0 && time - liftTime > 3000) {
+    liftDown();
+    delay(3000);
+    grabAll();
+    delay(3000);
+    liftUp();
+    delay(3000);
+    backward(0);
+    delay(1000);
+    brakeAll();
+    stopAll();
+    delay(3000);
+    liftDown();
+    delay(3000);
+    dropAll();
+    delay(3000);
+    liftUp();
+    delay(1000);
+  }
+    
+    
+    /*
+  if(cmCheck == true && distanceCheck != distance && distanceCheck != distance - 1 && distanceCheck != distance + 1 ) {
+    backward(-120);
+    delay(20);
+    brakeAll();
+    stopAll();
+  }
+  else if(cmCheck == true && distance >= 3 && (distanceCheck == distance || distanceCheck == distance - 1 || distanceCheck == distance + 1 )) {
+    cmCheck = false;
+  }
+  else if(cmCheck == true && distance == 2 && (distanceCheck == distance || distanceCheck == distance - 1 || distanceCheck == distance + 1 )) {
+    backward(-120);
+    delay(20);
+    brakeAll();
+    stopAll();
+  }*/
+  /*
+  lcd.setCursor(0, 0);
+  lcd.print(cmCheck);
+  lcd.print(" ");
+  lcd.print(distanceCheck);
+  lcd.print("...");*/
+  /*forward1();
+  delay(1000);
+  forward2();
+  delay(1000);
+  brake1();
+  stop1();
+  delay(1000);
+  brake2();
+  stop2();
+  delay(1000);
+  backward1();
+  delay(1000);
+  backward2();
+  delay(1000);
+  brake1();
+  stop1();
+  delay(1000);
+  brake2();
+  stop2();
+  delay(1000);
+  turnLeft();
+  delay(1000);
+  brakeAll();
+  stopAll();
+  delay(1000);
+  turnRight();
+  delay(1000);
+  brakeAll();
+  stopAll();*/
+}
+  
